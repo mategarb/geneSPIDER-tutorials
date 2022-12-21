@@ -1,0 +1,155 @@
+---
+title: "geneSPIDER tutorial"
+author: "Mateusz Garbulowski"
+date: "2/2/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Running geneSPIDER with bulk expression data
+
+This is a step-by-step tutorial of inferring a Gene Regulatory Network (GRN) with geneSPIDER for bulk RNA-seq perturbation experiments
+<center> 
+```{r echo=FALSE, results='asis', warning=FALSE, fig.cap="Figure 1. Workflow of the geneSPIDER network inference"}
+library(DiagrammeR)
+
+mermaid("
+graph TD
+A(Expression Data) --> B(Inferred Network) 
+",
+width=400,
+height=400)
+```
+</center>
+
+### Read the data
+
+```{r echo=FALSE, results='asis'}
+library(knitr)
+cn <- rep(c("G1","G2","G3","...","Gn"), 2)
+rn <- c("G1","G2","G3","...","Gn")
+insd <- diag(5)
+insd[,4] <- c("...","...","...","...","...")
+insd[4,] <- c("...","...","...","...","...")
+insd <- replace(insd, insd == "0", "...")
+#insd <- replace(insd, insd == "1", "-1")
+tab1 <- cbind(insd,insd)
+colnames(tab1) <- cn
+rownames(tab1) <- rn
+kable(tab1, caption="Table.1 Format of Y matrix for two replicates")
+```
+
+```{matlab}
+% load Y matrix (see Table 1)
+Yd = readtable("yourData.csv", 'ReadRowNames',true);
+% convert to array
+Y = table2array(Yd);
+% fetch size of data
+siz = size(Y);
+```
+
+### Construct a dataset
+
+```{matlab}
+% start with setting up an empty network
+% create a Network object
+A = zeros(N);
+Net = datastruct.Network(A, 'yourNetwork');
+
+% define signal-to-noise ratio
+% we assume no noise in the data, some high value e.g. 1
+SNR = 1;
+```
+
+```{r echo=FALSE, results='asis'}
+library(knitr)
+cn <- rep(c("G1","G2","G3","...","Gn"), 2)
+rn <- c("G1","G2","G3","...","Gn")
+insd <- diag(5)
+insd[,4] <- c("...","...","...","...","...")
+insd[4,] <- c("...","...","...","...","...")
+#insd <- replace(insd, insd == "0", "...")
+tab1 <- cbind(insd,insd)
+colnames(tab1) <- cn
+rownames(tab1) <- rn
+kable(tab1, caption="Table.2 Format of P matrix for two replicates")
+```
+
+
+```{matlab}
+% define the perturbation matrix for the experiment
+P = [eye(N) eye(N)]; % (see Table 2)
+% define 0 stdE
+stdE = 0;
+% define zero noise matrix
+E = [zeros(N) zeros(N)];
+% define input noise matrix as zeros
+F = zeros(size(P));
+
+% assign scale-free network
+D(1).network = Net.network;
+% define zero noise
+D(1).E = E;
+D(1).F = F;
+D(1).Y = Y;
+D(1).P = P;
+D(1).lambda = [stdE^2,0];
+D(1).cvY = D.lambda(1)*eye(N);
+D(1).cvP = zeros(N);
+D(1).sdY = stdE*ones(size(D.P));
+D(1).sdP = zeros(size(D.P));
+
+% create a data object with your data and scale-free network
+Data = datastruct.Dataset(D,Net);
+```
+### Infer a network
+
+```{r echo=FALSE, results='asis'}
+library(knitr)
+cn <- c("LSCO","LSCON","RNICO","GENIE3","LASSO","CLR")
+rn <- c("Method","Function")
+insd0 <- c("lsco",
+          "LSCON",
+          "RNI",
+          "Genie3",
+          "lasso",
+          "CLR")
+insd <- c("Least Squares Cut Off",
+          "Least Squares Cut-Off with Normalization",
+          "Robust Network Inference Cut Off",
+          "GEne Network Inference with Ensemble of trees",
+          "Least Absolute Shrinkage and Selection Operator",
+          "Context Likelihood of Relatedness")
+tab1 <- t(data.frame(insd, insd0))
+colnames(tab1) <- cn
+rownames(tab1) <- rn
+kable(tab1, caption="Table.3 Some inference methods")
+```
+
+```{matlab}
+zeta = logspace(-6,0,30);
+infMethod = 'LSCON'; % (see Table 3)
+[Aest0, z0] = Methods.(infMethod)(Data,zeta);
+
+% Aest0 contains 30 networks in tabular format (see Table 4)
+```
+
+```{r echo=FALSE, results='asis'}
+library(knitr)
+cn <- c("G1","G2","G3","...","Gn")
+rn <- c("G1","G2","G3","...","Gn")
+insd <- diag(5)
+insd[,4] <- c("...","...","...","...","...")
+insd[4,] <- c("...","...","...","...","...")
+insd <- replace(insd, insd == "0", "...")
+tab1 <- insd
+colnames(tab1) <- cn
+rownames(tab1) <- rn
+kable(tab1, caption="Table.4 Inferred network. Must be read from columns to rows.")
+```
